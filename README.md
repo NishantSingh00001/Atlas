@@ -85,12 +85,12 @@ The browser stores only the Supabase URL, publishable/anon key, and current auth
 - **Place photographs:** Wikimedia Commons; image pages and license attribution are shown in the image caption. Image lookup requires an internet connection.
 - **AI:** Gemini may invent details or return stale opening-hour information. Verify every booking-critical detail with the venue, airline, government, or travel provider.
 - **Maps/transit:** Links open third-party search pages; Atlas does not claim to have booked transit or verified live routing.
-- **Globe:** NASA Blue Marble is a composite base texture, not a live Earth feed. Cloud/sea shimmer is a visual simulation and does not represent measured clouds, water motion, or tides.
+- **Globe:** NASA Blue Marble is a composite base texture, not a live Earth feed. The globe uses NASA's topography-and-bathymetry map in GPU-selected 8192px/4096px versions. Cloud/sea shimmer is a visual simulation and does not represent measured clouds, water motion, or tides.
 - **Privacy:** Local-only trips stay in this browser. A copied trip link contains its itinerary in the URL; share it only with people you intend to show it to.
 
 ## Assets
 
-- `assets/textures/earth-blue-marble.jpg`: NASA Blue Marble: Next Generation, January global base map, 5400 × 2700. See [`assets/ASSET-CREDITS.md`](assets/ASSET-CREDITS.md).
+- `assets/textures/earth-topography-8192.jpg` and `assets/textures/earth-topography-4096.jpg`: optimized derivatives of NASA Blue Marble: Next Generation, January global base map with topography and bathymetry. See [`assets/ASSET-CREDITS.md`](assets/ASSET-CREDITS.md).
 - `assets/vendor/three.min.js`: Three.js r128; license included alongside it.
 - `assets/scenes/destinations.js`: bundled destination names, coordinates, aliases, and scene categories.
 - `assets/atlas-earth-horizon.png`: bundled illustrative Earth view used as an offline-safe fallback.

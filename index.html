@@ -154,14 +154,17 @@ const GL=(()=>{
   const scene=new THREE.Scene();
   const cam=new THREE.PerspectiveCamera(42,innerWidth/innerHeight,.1,100);cam.position.z=4.3;
   const rnd=new THREE.WebGLRenderer({antialias:true,alpha:true,powerPreference:'high-performance'});
-  rnd.setPixelRatio(Math.min(devicePixelRatio,1.8));rnd.setSize(innerWidth,innerHeight);rnd.outputEncoding=THREE.sRGBEncoding;host.appendChild(rnd.domElement);
+  rnd.setPixelRatio(Math.min(devicePixelRatio,2));rnd.setSize(innerWidth,innerHeight);rnd.outputEncoding=THREE.sRGBEncoding;host.appendChild(rnd.domElement);
   scene.add(new THREE.AmbientLight(0x91a9ca,.42));
   const sun=new THREE.DirectionalLight(0xffe6c2,1.12);sun.position.set(-3,2,4);scene.add(sun);
   const rim=new THREE.DirectionalLight(0x397eff,.72);rim.position.set(2,-1,-3);scene.add(rim);
   const globe=new THREE.Group();scene.add(globe);
-  const earthMap=new THREE.TextureLoader().load('assets/textures/earth-blue-marble.jpg',()=>{});
-  earthMap.anisotropy=Math.min(8,rnd.capabilities.getMaxAnisotropy());earthMap.encoding=THREE.sRGBEncoding;
-  const earth=new THREE.Mesh(new THREE.SphereGeometry(1,144,144),new THREE.MeshPhongMaterial({map:earthMap,color:0xb6c2d0,specular:new THREE.Color(0x263c54),shininess:8}));globe.add(earth);
+  const textureWidth=rnd.capabilities.maxTextureSize||4096;
+  const earthTexture=textureWidth>=8192?'assets/textures/earth-topography-8192.jpg':'assets/textures/earth-topography-4096.jpg';
+  const earthMap=new THREE.TextureLoader().load(earthTexture);
+  earthMap.anisotropy=Math.min(16,rnd.capabilities.getMaxAnisotropy());earthMap.encoding=THREE.sRGBEncoding;
+  earthMap.magFilter=THREE.LinearFilter;earthMap.minFilter=THREE.LinearMipmapLinearFilter;earthMap.generateMipmaps=true;
+  const earth=new THREE.Mesh(new THREE.SphereGeometry(1,192,192),new THREE.MeshPhongMaterial({map:earthMap,color:0xffffff,specular:new THREE.Color(0x263c54),shininess:10}));globe.add(earth);
   // A moving sea-surface sheen is confined to ocean pixels in NASA's geographic base map.
   const sea=new THREE.Mesh(new THREE.SphereGeometry(1.002,144,144),new THREE.ShaderMaterial({transparent:true,depthWrite:false,uniforms:{earthMap:{value:earthMap},time:{value:0}},vertexShader:'varying vec2 uv0; void main(){uv0=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',fragmentShader:`uniform sampler2D earthMap;uniform float time;varying vec2 uv0;void main(){vec3 c=texture2D(earthMap,uv0).rgb;float water=smoothstep(.025,.16,c.b-max(c.r,c.g)*.92);float wave=sin(uv0.x*510.0+sin(uv0.y*160.0+time*1.3)+time*2.1)*sin(uv0.y*290.0-time*1.2);float glint=smoothstep(.74,.99,wave)*.25;float swell=.025+.035*(.5+.5*sin(uv0.x*54.0-uv0.y*33.0+time*.7));gl_FragColor=vec4(.33,.75,1.0,water*(swell+glint));}`}));globe.add(sea);
   // Subtle cloud mantle: slow, soft shapes drift over the mapped surface.
