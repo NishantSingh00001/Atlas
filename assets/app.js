@@ -27,7 +27,18 @@
   const BASE_PACKING = ['Passport / ID and copies','Flight and accommodation confirmations','Payment cards and a little local cash','Travel insurance details','Prescription medicines','Phone, charger and power adapter','Comfortable walking shoes','Weather-appropriate layers','Reusable water bottle','Small day bag','Emergency contact details','Offline map downloaded'];
   let current = window.atlasCurrentTrip || null;
   let coordinates = { lat: 35.0116, lon: 135.7681, name: 'Kyoto, Japan' };
+  const PHOTO_STORE = 'atlas_destination_photo_cache_v1';
   const photoCache = new Map();
+  try {
+    const savedPhotos = JSON.parse(localStorage.getItem(PHOTO_STORE) || '{}');
+    Object.entries(savedPhotos).forEach(([place, photo]) => {
+      if (photo?.image?.startsWith('https://') && photo?.source?.startsWith('https://')) photoCache.set(place, photo);
+    });
+  } catch {}
+  const rememberPhoto = (place, photo) => {
+    photoCache.set(place, photo);
+    try { localStorage.setItem(PHOTO_STORE, JSON.stringify(Object.fromEntries([...photoCache].slice(-100)))); } catch {}
+  };
   let photoRequest = 0;
   const sceneCatalog = window.ATLAS_DESTINATIONS || [];
   const sceneFor = text => {
@@ -126,8 +137,8 @@
       ? 'linear-gradient(180deg,#07101c05 30%,#111913d9 100%),url("assets/kyoto-kiyomizu-editorial.png")'
       : 'linear-gradient(180deg,#07101c05 30%,#111913d9 100%),url("assets/atlas-earth-horizon.png")';
     $('visual-place').textContent = place.toUpperCase();
-    $('visual-loading').textContent = `SEEKING A LANDMARK · ${place.toUpperCase()}`;
-    $('visual-credit').textContent = kyotoFallback ? 'Illustrative Kyoto artwork · not a photograph' : 'Illustrative Earth view · finding this destination';
+    $('visual-loading').textContent = `FINDING A LANDMARK · ${place.toUpperCase()}`;
+    $('visual-credit').textContent = kyotoFallback ? 'Illustrative Kyoto artwork · not a photograph' : 'Looking for a verified landmark photograph';
     $('visual-credit').removeAttribute('href');
     return kyotoFallback;
   };
@@ -138,8 +149,10 @@
     const place = String(query || 'Kyoto, Japan').trim(); const kyotoFallback = preparePlaceVisual(place);
     if (photoCache.has(place)) return applyPhoto(photoCache.get(place));
     try {
-      const terms = `${place} famous landmark tourist attraction travel`;
-      const params = new URLSearchParams({ action:'query', generator:'search', gsrsearch:terms, gsrnamespace:'6', gsrlimit:'8', prop:'imageinfo', iiprop:'url|extmetadata', iiurlwidth:'1600', format:'json', origin:'*' });
+      const scene = sceneFor(place);
+      const landmark = scene?.landmark;
+      const terms = `${landmark ? `${landmark} ${place}` : place} landmark travel`;
+      const params = new URLSearchParams({ action:'query', generator:'search', gsrsearch:terms, gsrnamespace:'6', gsrlimit:'8', prop:'imageinfo', iiprop:'url|extmetadata', iiurlwidth:'900', format:'json', origin:'*' });
       const response = await fetch(`https://commons.wikimedia.org/w/api.php?${params}`);
       if (!response.ok) throw new Error('Photo search failed');
       const data = await response.json();
@@ -148,7 +161,7 @@
       if (!pages.length) throw new Error('No suitable public photograph found');
       const city = place.split(',')[0].trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
       const countryNames = new Set(['india','usa','france','italy','egypt','australia','nepal','switzerland','japan','uae']);
-      const matchingScene = sceneFor(place);
+      const matchingScene = scene;
       const matchTerms = [city, ...(matchingScene?.aliases || []).filter(alias => !countryNames.has(alias.toLowerCase()))]
         .map(term => term.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase()).filter(term => term.length > 2);
       const exactPlacePages = pages.filter(page => {
@@ -167,14 +180,31 @@
       const license = strip(meta.LicenseShortName?.value || 'See file page for license');
       const fileUrl = `https://commons.wikimedia.org/wiki/${encodeURIComponent(page.title.replaceAll(' ','_'))}`;
       const photo = { image: info.thumburl, title: page.title.replace('File:',''), author, license, source: fileUrl };
-      photoCache.set(place,photo); applyPhoto(photo);
+      rememberPhoto(place,photo); applyPhoto(photo);
     } catch {
       if (thisRequest !== photoRequest) return;
+      // The Commons search endpoint may be temporarily unavailable or may
+      // reject a broad query. Retry with the selected place's known landmark
+      // article so a matching image can still load from the Wikimedia API.
+      try {
+        const scene = sceneFor(place), article = scene?.landmark || place.split(',')[0].trim();
+        const fallbackUrl = new URL('https://en.wikipedia.org/w/api.php');
+        fallbackUrl.search = new URLSearchParams({ action:'query', titles:article, prop:'pageimages', format:'json', pithumbsize:'900', origin:'*' }).toString();
+        const fallbackResponse = await fetch(fallbackUrl);
+        const data = fallbackResponse.ok ? await fallbackResponse.json() : null;
+        const page = Object.values(data?.query?.pages || {})[0];
+        if (thisRequest !== photoRequest) return;
+        if (page?.thumbnail?.source) {
+          const articleUrl = `https://en.wikipedia.org/wiki/${encodeURIComponent((page.title || article).replaceAll(' ','_'))}`;
+          const photo = { image: page.thumbnail.source, title: page.title || article, author: 'Wikipedia article', license: 'Image source and attribution', source: articleUrl };
+          rememberPhoto(place, photo); applyPhoto(photo); return;
+        }
+      } catch { if (thisRequest !== photoRequest) return; }
       // Keep the place-specific Kyoto illustration only for Kyoto. For any
       // other city, show the explicitly labeled Earth view rather than a
       // photograph of the wrong destination.
-      $('visual-loading').textContent = kyotoFallback ? 'KIYOMIZU-DERA · KYOTO FIELD NOTE' : 'DESTINATION IMAGE NEEDS A CONNECTION';
-      $('visual-credit').textContent = kyotoFallback ? 'Illustrative artwork · not a real photograph' : 'Illustrative Earth artwork · not live satellite imagery';
+      $('visual-loading').textContent = kyotoFallback ? 'KIYOMIZU-DERA · KYOTO FIELD NOTE' : 'LANDMARK PHOTO UNAVAILABLE';
+      $('visual-credit').textContent = kyotoFallback ? 'Illustrative artwork · not a real photograph' : 'Could not load a matching image. Check your connection and try again.';
       $('visual-credit').removeAttribute('href');
     }
   };
