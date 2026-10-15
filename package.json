@@ -1,0 +1,7 @@
+{
+  "name": "atlas-trip-weaver",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": { "dev": "npx vercel dev" }
+}

@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Atlas — AI Trip Weaver</title>
+<meta name="description" content="Weave a day-by-day travel itinerary with AI and watch it trace across a living 3D globe.">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="assets/app.css">
+<style>
+:root{--bg:#060910;--bg2:#0b1020;--ink:#eaf0ff;--mut:#8ea0c4;--dim:#5b6b8e;--line:#1b2440;--acc:#6ea8ff;--acc2:#b98cff;--warm:#ffcf8b;--ok:#79e0b0}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:radial-gradient(1200px 800px at 70% -10%,#13203f 0%,var(--bg) 55%);color:var(--ink);font-family:Inter,system-ui,sans-serif;overflow-x:hidden}
+canvas{display:block}
+#globe{position:fixed;inset:0;z-index:0}
+.grain{position:fixed;inset:0;z-index:1;pointer-events:none;opacity:.05;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+.wrap{position:relative;z-index:2;max-width:1200px;margin:0 auto;padding:0 24px}
+.nav{display:flex;align-items:center;justify-content:space-between;padding:22px 0}
+.brand{display:flex;align-items:center;gap:11px;font-weight:600;letter-spacing:.02em}
+.mark{width:26px;height:26px;border-radius:50%;background:conic-gradient(from 200deg,var(--acc),var(--acc2),var(--warm),var(--acc));box-shadow:0 0 22px #6ea8ff66}
+.navlinks{display:flex;gap:22px;font-size:14px;color:var(--mut)}
+.navlinks a{color:inherit;text-decoration:none}.navlinks a:hover{color:var(--ink)}
+.key{font:500 12px/1 'IBM Plex Mono',monospace;color:var(--dim);border:1px solid var(--line);padding:8px 12px;border-radius:999px;cursor:pointer;background:#0b122440}
+.key:hover{color:var(--ink);border-color:var(--acc)}
+.hero{min-height:calc(100vh - 86px);display:flex;flex-direction:column;justify-content:center;padding-bottom:40px}
+.kick{font:500 12px/1 'IBM Plex Mono',monospace;letter-spacing:.32em;text-transform:uppercase;color:var(--acc);margin-bottom:22px}
+h1{font-family:Fraunces,serif;font-weight:600;font-size:clamp(44px,8vw,96px);line-height:.98;letter-spacing:-.02em;max-width:14ch}
+h1 em{font-style:italic;color:transparent;background:linear-gradient(120deg,var(--acc),var(--acc2) 60%,var(--warm));-webkit-background-clip:text;background-clip:text}
+.sub{margin-top:24px;max-width:52ch;color:var(--mut);font-size:clamp(15px,2vw,18px);line-height:1.6}
+.panel{margin-top:38px;background:linear-gradient(180deg,#0d152b99,#0a1022cc);border:1px solid var(--line);backdrop-filter:blur(14px);border-radius:20px;padding:20px;max-width:720px;box-shadow:0 30px 80px #0008}
+.row{display:flex;gap:12px;flex-wrap:wrap}
+.field{flex:1;min-width:180px;display:flex;flex-direction:column;gap:7px}
+label{font:500 11px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+input,select,textarea{background:#070c18;border:1px solid var(--line);color:var(--ink);border-radius:12px;padding:13px 14px;font:inherit;font-size:15px;outline:none;transition:.15s}
+input:focus,select:focus,textarea:focus{border-color:var(--acc);box-shadow:0 0 0 3px #6ea8ff22}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
+.chip{font-size:13px;color:var(--mut);border:1px solid var(--line);padding:7px 12px;border-radius:999px;cursor:pointer;user-select:none;transition:.15s}
+.chip:hover{color:var(--ink)}.chip.on{background:var(--acc);color:#04142e;border-color:var(--acc);font-weight:600}
+.go{margin-top:16px;width:100%;padding:15px;border:none;border-radius:13px;background:linear-gradient(120deg,var(--acc),var(--acc2));color:#05102a;font-weight:700;font-size:16px;letter-spacing:.01em;cursor:pointer;transition:.15s;box-shadow:0 12px 40px #6ea8ff44}
+.go:hover{transform:translateY(-1px);box-shadow:0 18px 50px #6ea8ff55}
+.go:disabled{opacity:.6;cursor:wait;transform:none}
+.note{margin-top:12px;font-size:12.5px;color:var(--dim)}
+.note a{color:var(--acc)}
+/* results */
+#out{position:relative;z-index:2;max-width:1200px;margin:0 auto;padding:0 24px 100px}
+.trip-head{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap;margin:40px 0 8px}
+.trip-head h2{font-family:Fraunces,serif;font-weight:600;font-size:clamp(28px,5vw,44px);letter-spacing:-.01em}
+.trip-head .meta{color:var(--mut);font-size:14px}
+.days{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:18px;margin-top:26px}
+.day{background:linear-gradient(180deg,#0d152b88,#0a1022aa);border:1px solid var(--line);border-radius:18px;padding:20px;opacity:0;transform:translateY(16px);animation:rise .6s forwards}
+@keyframes rise{to{opacity:1;transform:none}}
+.day h3{font-family:Fraunces,serif;font-size:21px;font-weight:600;display:flex;align-items:center;gap:10px}
+.dnum{font:600 12px/1 'IBM Plex Mono',monospace;color:#05102a;background:var(--warm);padding:6px 9px;border-radius:8px}
+.day .place{font-size:13px;color:var(--acc);margin-top:3px;font-family:'IBM Plex Mono',monospace}
+.stop{margin-top:14px;padding-left:16px;border-left:2px solid var(--line);position:relative}
+.stop::before{content:"";position:absolute;left:-5px;top:6px;width:8px;height:8px;border-radius:50%;background:var(--acc2)}
+.stop .t{font:500 11px/1 'IBM Plex Mono',monospace;color:var(--dim);letter-spacing:.1em}
+.stop .n{font-weight:600;margin:3px 0}
+.stop .d{font-size:13.5px;color:var(--mut);line-height:1.5}
+.loading{display:flex;align-items:center;gap:12px;color:var(--mut);font-size:14px;margin-top:30px;font-family:'IBM Plex Mono',monospace}
+.spin{width:16px;height:16px;border:2px solid var(--line);border-top-color:var(--acc);border-radius:50%;animation:sp 1s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.err{margin-top:24px;background:#2a0f17;border:1px solid #5a2030;color:#ffb8c4;padding:14px 16px;border-radius:12px;font-size:14px}
+.foot{position:relative;z-index:2;text-align:center;color:var(--dim);font-size:12.5px;padding:30px 0 50px;font-family:'IBM Plex Mono',monospace}
+/* modal */
+.modal{position:fixed;inset:0;z-index:40;display:none;align-items:center;justify-content:center;background:#03060cde;backdrop-filter:blur(6px)}
+.modal.on{display:flex}
+.mcard{background:var(--bg2);border:1px solid var(--line);border-radius:18px;padding:26px;max-width:440px;width:92%}
+.mcard h3{font-family:Fraunces,serif;font-size:22px;margin-bottom:10px}
+.mcard p{color:var(--mut);font-size:14px;line-height:1.6;margin-bottom:14px}
+.mcard input{width:100%}
+.mrow{display:flex;gap:10px;margin-top:16px}
+.mrow button{flex:1;padding:12px;border-radius:11px;border:1px solid var(--line);background:#0b1224;color:var(--ink);font-weight:600;cursor:pointer}
+.mrow button.p{background:var(--acc);color:#05102a;border-color:var(--acc)}
+@media(max-width:640px){.navlinks{display:none}}
+/* Direction 01 — real Earth imagery, editorial globe, and a warm field-book composer. */
+:root{--paper:#efe7d6;--paper-ink:#28251f;--paper-muted:#777166;--paper-line:#d8ceb9}
+#globe canvas{filter:drop-shadow(0 18px 70px #16356744)}
+.panel{color:var(--paper-ink);background:linear-gradient(145deg,#f5eee0f2,#e7dcc8ed);border:1px solid #fff8e3aa;border-radius:3px;padding:22px;box-shadow:0 26px 85px #0008,inset 0 1px #fff9;backdrop-filter:blur(16px);transform:rotate(-.35deg);transition:transform .35s,box-shadow .35s}
+.panel:hover{transform:rotate(0) translateY(-2px);box-shadow:0 32px 95px #0009,inset 0 1px #fff9}
+.panel label{color:#766c5b}.panel input,.panel select,.panel textarea{color:#292820;background:#f8f4eb;border:1px solid var(--paper-line);border-radius:3px;box-shadow:inset 0 1px 3px #4d36110c}.panel input::placeholder{color:#999080}.panel input:focus,.panel select:focus{border-color:#8b9d93;box-shadow:0 0 0 3px #7a9d9a22}
+.panel .chip{color:#6d685f;border-color:#cfc4ae;background:#f8f3e9}.panel .chip:hover{color:#24251f;border-color:#958d7e}.panel .chip.on{color:#fff;background:#314f53;border-color:#314f53}
+.panel .go{background:linear-gradient(110deg,#283f44,#516e67);color:#f8f1e4;box-shadow:0 12px 30px #364e4b3b;border-radius:3px}.panel .go:hover{box-shadow:0 16px 40px #364e4b55}.panel .note{color:#746e63}.panel .note a{color:#315c68}
+.scene-picks{margin-top:16px;padding:12px 0 1px;border-top:1px solid #bdb19b88}.scene-picks-head{display:flex;justify-content:space-between;gap:10px;margin-bottom:8px;font:500 9px/1.2 'IBM Plex Mono',monospace;letter-spacing:.12em;color:#817765}.scene-picks-head span:last-child{color:#355a5b;text-align:right}.scene-chips{display:flex;gap:6px;flex-wrap:wrap}.scene-chip{padding:6px 9px;border:1px solid #cfc4ae;border-radius:999px;background:#f7f1e5;color:#6f6759;font:500 10px 'IBM Plex Mono',monospace;cursor:pointer;transition:background .2s,color .2s,transform .2s,border-color .2s}.scene-chip:hover{transform:translateY(-2px);border-color:#6c8d89;color:#314f53}.scene-chip.selected{color:#fff;background:#455f5b;border-color:#455f5b}
+.foot{max-width:900px;margin:0 auto;padding-inline:20px;line-height:1.7;font-size:10px;letter-spacing:.05em}.day{border-radius:3px;background:linear-gradient(150deg,#f5edde,#e9dfcc);border-color:#c9bda7;color:#24251f}.day .place{color:#3c6d77}.day .stop{border-color:#cfc4ae}.day .stop .t{color:#8b7f6b}.day .stop .d{color:#5e5a52}.trip-head .meta{color:#c4cde0}
+@media(max-width:640px){.panel{padding:16px;transform:none}.scene-picks-head{font-size:8px}.scene-chip{font-size:9px;padding:6px 8px}.foot{font-size:9px}}
+</style></head>
+<body>
+<div id="globe"></div><div class="grain"></div>
+<div class="atlas-cursor" id="atlas-cursor" aria-hidden="true"><span class="cursor-north">N</span><i></i><b></b></div>
+
+<div class="wrap">
+  <nav class="nav">
+    <div class="brand"><span class="mark"></span>Atlas</div>
+    <div class="navlinks"><a href="#tools">Trip tools</a><a href="#saved">Saved journeys</a><a href="#" onclick="demo();return false">Try a demo</a></div>
+    <button class="key" onclick="document.getElementById('settings').scrollIntoView({behavior:'smooth'})">⚙ Settings</button>
+  </nav>
+
+  <section class="hero">
+    <div class="kick">AI itineraries · on a living globe</div>
+    <h1>Weave a trip that <em>traces the earth</em>.</h1>
+    <p class="sub">Tell Atlas where you're going and the mood you're after. It drafts a day-by-day plan — real places, timed stops, honest notes — and threads it across a 3D globe you can spin.</p>
+    <figure class="destination-visual" id="destination-visual" aria-live="polite"><div class="visual-image" id="visual-image"></div><figcaption><span class="visual-place" id="visual-place">KYOTO, JAPAN · EDITORIAL VIEW</span><a class="visual-credit" id="visual-credit">Generated visual · not live satellite imagery</a></figcaption><div class="visual-loading" id="visual-loading">ILLUSTRATIVE EARTH HORIZON · ATLAS VISUAL</div></figure>
+
+    <div class="panel">
+      <div class="row">
+        <div class="field" style="flex:2"><label>Destination</label><input id="dest" placeholder="Lisbon, Portugal" value="Kyoto, Japan"></div>
+        <div class="field" style="max-width:120px"><label>Days</label><input id="days" type="number" min="1" max="10" value="4"></div>
+      </div>
+      <div class="field" style="margin-top:12px"><label>Vibe</label>
+      <div class="chips" id="vibes"></div>
+      </div>
+      <div class="field" style="margin-top:12px"><label>Anything to weave in? (optional)</label><input id="notes" placeholder="temples at sunrise, great coffee, not too touristy"></div>
+      <div class="scene-picks"><div class="scene-picks-head"><span>LOCAL 3D SCENE LIBRARY</span><span id="scene-status">KYOTO · JAPAN</span></div><div class="scene-chips" id="scene-chips"></div></div>
+      <button class="go" id="go" onclick="plan()">Weave my itinerary →</button>
+    <div class="note">AI plans run through a private server function when configured. Check opening hours, entry rules, and availability with providers before booking. <a href="#" onclick="demo();return false">Explore the working demo ↗</a></div>
+    </div>
+  </section>
+</div>
+
+<div id="out"></div>
+<main class="wrap utilities" id="tools">
+  <div class="section-title"><div><div class="kick">THE TRIP, TAKEN CARE OF</div><h2>Everything between here and there.</h2></div><p>Useful details, in one calm workspace. Your saved journeys stay on this device unless you export them.</p></div>
+  <div class="utility-grid">
+    <article class="utility-card weather-card"><div class="card-kicker">01 · CONDITIONS</div><h3>Know what to pack for.</h3><p>Live forecast from Open-Meteo for your destination coordinates.</p><div class="weather-readout" id="weather-readout"><span class="weather-temp">—°</span><span>Choose a destination, then get the forecast.</span></div><div id="weather-next-days"></div><button class="text-action" id="weather-button">Check destination weather ↗</button></article>
+    <article class="utility-card budget-card"><div class="card-kicker">02 · SPENDING</div><h3>Keep the trip in range.</h3><p>Set a daily budget and see a quick trip total with an exchange-rate estimate.</p><div class="budget-inputs"><label>Daily budget <span><input type="number" id="daily-budget" min="0" value="5000"> <select id="budget-currency"><option>INR</option><option>USD</option><option>EUR</option><option>GBP</option><option>JPY</option></select></span></label><div class="budget-total" id="budget-total">₹20,000 <small>estimated trip budget</small></div><button class="text-action" id="currency-button">Convert estimate ↗</button><div id="currency-result" class="subtle"></div></div></article>
+    <article class="utility-card checklist-card"><div class="card-kicker">03 · READY TO GO</div><h3>A list that adapts to this trip.</h3><p>Tick off essentials. Your progress is saved automatically.</p><div class="checklist" id="packing-list"></div><button class="text-action" id="add-check-item">+ Add your own item</button></article>
+    <article class="utility-card details-card"><div class="card-kicker">04 · LOCAL DETAILS</div><h3>Arrive a little more prepared.</h3><p>Time-zone, map search, transit, and useful official travel references.</p><div id="local-details" class="detail-list"><span>Choose a supported destination.</span></div><div class="detail-links"><a id="map-link" href="https://www.openstreetmap.org" target="_blank" rel="noreferrer">Explore map ↗</a><a id="airport-link" href="https://www.google.com/maps/search/airport" target="_blank" rel="noreferrer">Nearby airports ↗</a><a id="transit-link" href="https://www.google.com/maps/search/transit" target="_blank" rel="noreferrer">Public transit ↗</a><a href="https://www.mea.gov.in/travel-advisories.htm" target="_blank" rel="noreferrer">India travel advisories ↗</a></div></article>
+  </div>
+  <section class="journey-tools">
+    <div class="section-title compact"><div><div class="kick">YOUR JOURNEY FILE</div><h2>Make it yours.</h2></div><p>Save, revisit, share, and take your plans offline.</p></div>
+    <div class="tool-row"><button class="tool-button primary" id="save-trip">Save this journey</button><button class="tool-button" id="share-trip">Share link</button><button class="tool-button" id="export-trip">Download JSON</button><button class="tool-button" id="import-trip">Import backup</button><input type="file" id="import-file" accept="application/json,.json" hidden><button class="tool-button" id="print-trip">Print / save PDF</button><button class="tool-button" id="new-checklist">Reset packing list</button></div>
+    <div class="saved-row" id="saved"><label for="saved-trips">Your saved journeys</label><select id="saved-trips"><option value="">No saved journeys yet</option></select><button class="tool-button" id="load-trip">Open</button><button class="tool-button danger" id="delete-trip">Delete</button><span class="save-status" id="save-status">Saved privately on this device</span></div>
+    <div class="settings-row" id="settings"><label><input type="checkbox" id="reduce-motion"> Reduce motion</label><label><input type="checkbox" id="large-type"> Larger text</label><label><input type="checkbox" id="light-theme"> Paper-light theme</label><label class="passport-label">Passport expiry check <input type="date" id="passport-expiry"></label><span id="passport-status" class="subtle">Expiry date stays on this device.</span></div>
+    <section class="cloud-panel" aria-labelledby="cloud-heading">
+      <div class="cloud-intro"><div><div class="card-kicker">OPTIONAL · PRIVATE CLOUD SYNC</div><h3 id="cloud-heading">Your journeys, wherever you land.</h3></div><p>Atlas keeps trips on this device by default. Connect your own Supabase project to carry them between devices; your credentials stay in this browser.</p></div>
+      <div class="cloud-form">
+        <section class="cloud-block"><div class="cloud-step"><span>01</span> CONNECT A PROJECT</div><input id="supabase-url" placeholder="https://your-project.supabase.co" aria-label="Supabase project URL"><input id="supabase-key" placeholder="Supabase publishable / anon key" aria-label="Supabase public key"><button class="tool-button cloud-connect" id="supabase-config">Save connection <span>↗</span></button></section>
+        <section class="cloud-block"><div class="cloud-step"><span>02</span> SIGN IN TO SYNC</div><div class="cloud-login-fields"><input id="cloud-email" type="email" placeholder="Email" aria-label="Cloud backup email"><input id="cloud-password" type="password" placeholder="Password" aria-label="Cloud backup password"></div><div class="tool-row"><button class="tool-button" id="cloud-signup">Create account</button><button class="tool-button" id="cloud-login">Sign in</button><button class="tool-button" id="cloud-logout">Sign out</button><button class="tool-button primary" id="cloud-backup">Back up / sync</button><button class="tool-button" id="cloud-restore">Restore journeys</button></div></section>
+      </div>
+      <span class="save-status" id="cloud-status"><i></i> Not connected · your trips remain saved locally.</span>
+    </section>
+  </section>
+</main>
+<div class="foot">Atlas · an evidence-led travel atlas · NASA Blue Marble base imagery · cloud and sea motion are visual simulations · planning details should be checked with official providers</div>
+
+
+<script src="assets/vendor/three.min.js"></script>
+<script src="assets/scenes/destinations.js"></script>
+<script>
+/* ---------- globe ---------- */
+const GL=(()=>{
+  const host=document.getElementById('globe');
+  const scene=new THREE.Scene();
+  const cam=new THREE.PerspectiveCamera(42,innerWidth/innerHeight,.1,100);cam.position.z=4.3;
+  const rnd=new THREE.WebGLRenderer({antialias:true,alpha:true,powerPreference:'high-performance'});
+  rnd.setPixelRatio(Math.min(devicePixelRatio,1.8));rnd.setSize(innerWidth,innerHeight);rnd.outputEncoding=THREE.sRGBEncoding;host.appendChild(rnd.domElement);
+  scene.add(new THREE.AmbientLight(0x91a9ca,.42));
+  const sun=new THREE.DirectionalLight(0xffe6c2,1.12);sun.position.set(-3,2,4);scene.add(sun);
+  const rim=new THREE.DirectionalLight(0x397eff,.72);rim.position.set(2,-1,-3);scene.add(rim);
+  const globe=new THREE.Group();scene.add(globe);
+  const earthMap=new THREE.TextureLoader().load('assets/textures/earth-blue-marble.jpg',()=>{});
+  earthMap.anisotropy=Math.min(8,rnd.capabilities.getMaxAnisotropy());earthMap.encoding=THREE.sRGBEncoding;
+  const earth=new THREE.Mesh(new THREE.SphereGeometry(1,144,144),new THREE.MeshPhongMaterial({map:earthMap,color:0xb6c2d0,specular:new THREE.Color(0x263c54),shininess:8}));globe.add(earth);
+  // A moving sea-surface sheen is confined to ocean pixels in NASA's geographic base map.
+  const sea=new THREE.Mesh(new THREE.SphereGeometry(1.002,144,144),new THREE.ShaderMaterial({transparent:true,depthWrite:false,uniforms:{earthMap:{value:earthMap},time:{value:0}},vertexShader:'varying vec2 uv0; void main(){uv0=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',fragmentShader:`uniform sampler2D earthMap;uniform float time;varying vec2 uv0;void main(){vec3 c=texture2D(earthMap,uv0).rgb;float water=smoothstep(.025,.16,c.b-max(c.r,c.g)*.92);float wave=sin(uv0.x*510.0+sin(uv0.y*160.0+time*1.3)+time*2.1)*sin(uv0.y*290.0-time*1.2);float glint=smoothstep(.74,.99,wave)*.25;float swell=.025+.035*(.5+.5*sin(uv0.x*54.0-uv0.y*33.0+time*.7));gl_FragColor=vec4(.33,.75,1.0,water*(swell+glint));}`}));globe.add(sea);
+  // Subtle cloud mantle: slow, soft shapes drift over the mapped surface.
+  const clouds=new THREE.Mesh(new THREE.SphereGeometry(1.012,96,96),new THREE.ShaderMaterial({transparent:true,depthWrite:false,uniforms:{time:{value:0}},vertexShader:'varying vec2 uv0;void main(){uv0=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',fragmentShader:`uniform float time;varying vec2 uv0;float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);return mix(mix(hash(i),hash(i+vec2(1.,0.)),f.x),mix(hash(i+vec2(0.,1.)),hash(i+vec2(1.,1.)),f.x),f.y);}void main(){vec2 p=uv0*vec2(18.,8.)+vec2(time*.009,-time*.003);float n=noise(p)+.42*noise(p*2.1)+.18*noise(p*4.2);float a=smoothstep(.82,1.17,n)*.26;gl_FragColor=vec4(.78,.88,1.,a);}`}));globe.add(clouds);
+  // Atmospheric limb gives the sphere a true orbital edge rather than a flat dot mesh.
+  const atm=new THREE.Mesh(new THREE.SphereGeometry(1.075,96,96),new THREE.ShaderMaterial({transparent:true,side:THREE.BackSide,depthWrite:false,uniforms:{time:{value:0}},vertexShader:'varying vec3 n;void main(){n=normalize(normalMatrix*normal);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',fragmentShader:'uniform float time;varying vec3 n;void main(){float i=pow(max(0.0,.82-dot(normalize(n),vec3(0.0,0.0,1.0))),3.1);float pulse=.76+.16*sin(time*1.4);gl_FragColor=vec4(.22,.52,1.,i*pulse);}'}));scene.add(atm);
+  let targetRot=null,targetZoom=4.3;
+  function layoutGlobe(){const mobile=innerWidth<700;globe.position.set(mobile?.22:.76,-.04,0);atm.position.copy(globe.position);if(!targetRot)cam.position.z=mobile?4.9:4.3;}
+  layoutGlobe();
+  // Fine star field; deterministic placement keeps the scene stable on every load.
+  const starPos=[];let seed=79231;const random=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};for(let i=0;i<1500;i++){const a=random()*Math.PI*2,z=random()*2-1,r=Math.sqrt(1-z*z),d=8+random()*20;starPos.push(Math.cos(a)*r*d,z*d,Math.sin(a)*r*d);}const starGeo=new THREE.BufferGeometry();starGeo.setAttribute('position',new THREE.Float32BufferAttribute(starPos,3));const stars=new THREE.Points(starGeo,new THREE.PointsMaterial({color:0xa8c7ff,size:.035,transparent:true,opacity:.56,sizeAttenuation:true}));scene.add(stars);
+  const pinG=new THREE.Group();globe.add(pinG);const arcG=new THREE.Group();globe.add(arcG);const landmarkG=new THREE.Group();globe.add(landmarkG);
+  function v(lat,lon,r=1.018){const a=(90-lat)*Math.PI/180,b=(lon+180)*Math.PI/180;return new THREE.Vector3(-r*Math.sin(a)*Math.cos(b),r*Math.cos(a),r*Math.sin(a)*Math.sin(b));}
+  function clear(G){while(G.children.length){const o=G.children.pop();G.remove(o);if(o.geometry)o.geometry.dispose();if(o.material){if(Array.isArray(o.material))o.material.forEach(m=>m.dispose());else o.material.dispose();}}}
+  function addPins(pts){clear(pinG);clear(arcG);let prev=null;const col=[0x86c4ff,0xd1a6ff,0xffd493,0x81edcf];pts.forEach((p,i)=>{const P=v(p.lat,p.lon,1.008),phase=i*1.73;const m=new THREE.Mesh(new THREE.SphereGeometry(.012,20,20),new THREE.MeshBasicMaterial({color:col[i%4]}));m.position.copy(P);m.userData.locationMarker=true;m.userData.phase=phase;pinG.add(m);const ring=new THREE.Mesh(new THREE.RingGeometry(.02,.026,48),new THREE.MeshBasicMaterial({color:col[i%4],transparent:true,opacity:.76,side:THREE.DoubleSide}));ring.position.copy(P);ring.lookAt(0,0,0);ring.userData.pulse=true;ring.userData.phase=phase;pinG.add(ring);if(prev){const mid=prev.clone().add(P).multiplyScalar(.5).setLength(1.15),path=new THREE.QuadraticBezierCurve3(prev,mid,P),geo=new THREE.BufferGeometry().setFromPoints(path.getPoints(80));arcG.add(new THREE.Line(geo,new THREE.LineBasicMaterial({color:col[i%4],transparent:true,opacity:.56})));const traveler=new THREE.Mesh(new THREE.SphereGeometry(.009,12,12),new THREE.MeshBasicMaterial({color:0xffe1a3}));traveler.userData.path=path;traveler.userData.phase=i*.31;arcG.add(traveler);}prev=P;});if(pts.length){const t=v(pts[0].lat,pts[0].lon);targetRot={x:-Math.atan2(t.y,Math.sqrt(t.x*t.x+t.z*t.z)),y:-Math.atan2(t.x,t.z)+Math.PI};targetZoom=innerWidth<700?3.55:2.95;}}
+  function mountLandmark(lat,lon,kind='mountain'){clear(landmarkG);const P=v(lat,lon,1.008),root=new THREE.Group();root.position.copy(P);root.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),P.clone().normalize());landmarkG.add(root);const mat=(color,roughness=.82)=>new THREE.MeshStandardMaterial({color,roughness,metalness:.04});const stone=mat(0x6b788d),snow=mat(0xe9f3f7),green=mat(0x376859),warm=mat(0xd7ab73),white=mat(0xf0e6d4),gold=mat(0xdcb96f,.46);
+    if(kind==='fuji'||kind==='alps'||kind==='mountain'){const count=kind==='fuji'?1:5;for(let i=0;i<count;i++){const h=kind==='fuji'?.16:.09+random()*.09,rad=kind==='fuji'?.085:.055+random()*.045,m=new THREE.Mesh(new THREE.ConeGeometry(rad,h,8),stone);m.position.set((i-(count-1)/2)*.045,h/2,((i%2)-.5)*.045);root.add(m);const cap=new THREE.Mesh(new THREE.ConeGeometry(rad*.52,h*.25,8),snow);cap.position.set(m.position.x,h*.82,m.position.z);root.add(cap);}for(let i=0;i<18;i++){const t=new THREE.Group(),tr=new THREE.Mesh(new THREE.CylinderGeometry(.002,.003,.018,5),warm),fol=new THREE.Mesh(new THREE.ConeGeometry(.009,.035,6),green);tr.position.y=.009;fol.position.y=.031;t.add(tr,fol);t.position.set((random()-.5)*.23,-.025+(random()*.015),(random()-.5)*.18);root.add(t);}}
+    if(kind==='kyoto'||kind==='pagoda'){for(let i=0;i<5;i++){const w=.11-i*.016,y=i*.025;const roof=new THREE.Mesh(new THREE.CylinderGeometry(w*.08,w,.016,4),warm);roof.rotation.y=Math.PI/4;roof.position.y=y+.055;root.add(roof);const tier=new THREE.Mesh(new THREE.BoxGeometry(w*.52,.032,w*.52),white);tier.position.y=y+.03;root.add(tier);}const fin=new THREE.Mesh(new THREE.CylinderGeometry(.002,.003,.09,7),gold);fin.position.y=.19;root.add(fin);}
+    if(kind==='taj'){const base=new THREE.Mesh(new THREE.BoxGeometry(.22,.025,.15),white);base.position.y=.02;root.add(base);const hall=new THREE.Mesh(new THREE.BoxGeometry(.14,.075,.105),white);hall.position.y=.065;root.add(hall);const dome=new THREE.Mesh(new THREE.SphereGeometry(.045,24,16,0,Math.PI*2,0,Math.PI/2),white);dome.position.y=.10;root.add(dome);for(const [x,z] of [[-.09,-.06],[.09,-.06],[-.09,.06],[.09,.06]]){const min=new THREE.Mesh(new THREE.CylinderGeometry(.006,.009,.12,8),white);min.position.set(x,.075,z);root.add(min);const top=new THREE.Mesh(new THREE.ConeGeometry(.009,.025,8),gold);top.position.set(x,.147,z);root.add(top);}}
+    if(kind==='mysore'){const plinth=new THREE.Mesh(new THREE.BoxGeometry(.22,.025,.15),mat(0x79664b));plinth.position.y=.012;root.add(plinth);const hall=new THREE.Mesh(new THREE.BoxGeometry(.19,.095,.12),mat(0xe3d3b2));hall.position.y=.07;root.add(hall);for(const x of [-.075,-.025,.025,.075]){const bay=new THREE.Mesh(new THREE.BoxGeometry(.026,.07,.13),mat(0xf0dfbd));bay.position.set(x,.06,0);root.add(bay);}for(const [x,z,r,h] of [[-.075,0,.026,.055],[0,0,.036,.085],[.075,0,.026,.055]]){const dome=new THREE.Mesh(new THREE.SphereGeometry(r,20,12,0,Math.PI*2,0,Math.PI/2),mat(0xc49b57,.5));dome.position.set(x,.125+h*.35,z);root.add(dome);const finial=new THREE.Mesh(new THREE.ConeGeometry(.006,.025,6),gold);finial.position.set(x,.125+h*.9,z);root.add(finial);}for(const x of [-.105,.105]){const tower=new THREE.Mesh(new THREE.CylinderGeometry(.013,.018,.13,8),mat(0xe7d9bd));tower.position.set(x,.075,0);root.add(tower);const cap=new THREE.Mesh(new THREE.SphereGeometry(.018,16,10),mat(0x3b7770,.45));cap.position.set(x,.15,0);root.add(cap);}}
+    if(kind==='eiffel'){const foot=new THREE.Mesh(new THREE.CylinderGeometry(.018,.067,.18,4),warm);foot.position.y=.09;root.add(foot);for(let y=.03;y<.16;y+=.025){const bar=new THREE.Mesh(new THREE.BoxGeometry(.09*(1-y),.008,.008),gold);bar.position.y=y;root.add(bar);}const tip=new THREE.Mesh(new THREE.ConeGeometry(.012,.045,6),gold);tip.position.y=.2;root.add(tip);}
+    if(kind==='colosseum'){const shell=new THREE.Mesh(new THREE.CylinderGeometry(.11,.13,.105,32,1,true),warm);shell.position.y=.055;root.add(shell);for(let i=0;i<14;i++){const arch=new THREE.Mesh(new THREE.TorusGeometry(.009,.002,5,12,Math.PI),white);arch.rotation.z=Math.PI;arch.position.set(Math.cos(i*Math.PI/7)*.121,.046,Math.sin(i*Math.PI/7)*.121);root.add(arch);}}
+    if(kind==='pyramids'){for(const [x,z,r,h] of [[-.06,-.015,.065,.12],[.055,.015,.047,.09],[.12,-.035,.025,.05]]){const p=new THREE.Mesh(new THREE.ConeGeometry(r,h,4),mat(0xc1a16d));p.rotation.y=Math.PI/4;p.position.set(x,h/2,z);root.add(p);}const sand=new THREE.Mesh(new THREE.CircleGeometry(.17,32),mat(0xb98e59));sand.rotation.x=-Math.PI/2;sand.position.y=-.012;root.add(sand);}
+    if(kind==='opera'){const base=new THREE.Mesh(new THREE.BoxGeometry(.2,.02,.11),mat(0x65818a));base.position.y=.01;root.add(base);for(let i=0;i<4;i++){const shell=new THREE.Mesh(new THREE.SphereGeometry(.05,24,12,0,Math.PI,0,Math.PI/2),white);shell.scale.set(1.25,.75,.72);shell.position.set(-.055+i*.037,.06,(i%2-.5)*.04);root.add(shell);}}
+    if(kind==='burj'){for(let i=0;i<6;i++){const h=.07+i*.022,r=.045-i*.006,tower=new THREE.Mesh(new THREE.CylinderGeometry(r*.5,r,h,8),mat(i%2?0x9dc8dc:0xe6d5a7,.35));tower.position.set(i%2?-.025:.02,h/2,0);root.add(tower);}const spire=new THREE.Mesh(new THREE.ConeGeometry(.004,.1,6),gold);spire.position.y=.21;root.add(spire);}
+    if(kind==='liberty'){const plinth=new THREE.Mesh(new THREE.BoxGeometry(.07,.045,.07),mat(0x817970));plinth.position.y=.022;root.add(plinth);const body=new THREE.Mesh(new THREE.CylinderGeometry(.014,.022,.075,8),mat(0x76a995));body.position.y=.08;root.add(body);const head=new THREE.Mesh(new THREE.SphereGeometry(.014,12,10),mat(0x76a995));head.position.y=.126;root.add(head);const torch=new THREE.Mesh(new THREE.SphereGeometry(.008,10,10),gold);torch.position.set(.035,.15,0);root.add(torch);}
+    const halo=new THREE.Mesh(new THREE.TorusGeometry(.13,.0015,4,80),new THREE.MeshBasicMaterial({color:0x8fc6ff,transparent:true,opacity:.7}));halo.rotation.x=Math.PI/2;halo.position.y=-.026;root.add(halo);root.scale.setScalar(0);root.userData.targetScale=1;return root;}
+  let drag=false,px=0,py=0;
+  host.addEventListener('pointerdown',e=>{drag=true;px=e.clientX;py=e.clientY;targetRot=null;});addEventListener('pointerup',()=>drag=false);addEventListener('pointermove',e=>{if(!drag)return;globe.rotation.y+=(e.clientX-px)*.004;globe.rotation.x=Math.max(-1.05,Math.min(1.05,globe.rotation.x+(e.clientY-py)*.004));px=e.clientX;py=e.clientY;});
+  const clock=new THREE.Clock();(function loop(){requestAnimationFrame(loop);const t=clock.getElapsedTime(),reduced=document.documentElement.classList.contains('atlas-reduced-motion');sea.material.uniforms.time.value=reduced?0:t;clouds.material.uniforms.time.value=reduced?0:t;atm.material.uniforms.time.value=reduced?0:t;stars.rotation.y=reduced?0:t*.0012;if(targetRot){const dy=Math.atan2(Math.sin(targetRot.y-globe.rotation.y),Math.cos(targetRot.y-globe.rotation.y)),dx=targetRot.x-globe.rotation.x;globe.rotation.y+=dy*.035;globe.rotation.x+=dx*.035;cam.position.z+=(targetZoom-cam.position.z)*.035;if(Math.abs(dx)<.001&&Math.abs(dy)<.001)targetRot=null;}else if(!drag&&!reduced){globe.rotation.y+=.00095;}if(!reduced){pinG.children.forEach(o=>{const phase=o.userData.phase||0;if(o.userData.pulse){const pulse=.5+.5*Math.sin(t*2.3+phase);o.scale.setScalar(1+pulse*.3);o.material.opacity=.48+pulse*.42;}if(o.userData.locationMarker){const pulse=.5+.5*Math.sin(t*2.3+phase);o.scale.setScalar(1+pulse*.34);}});arcG.children.forEach(o=>{if(o.userData.path){const u=(t*.17+o.userData.phase)%1;o.position.copy(o.userData.path.getPoint(u));}});landmarkG.children.forEach(o=>{const s=Math.min(1,o.scale.x+.018);o.scale.setScalar(s);o.rotation.y+=.001;});}rnd.render(scene,cam);})();
+  addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();rnd.setPixelRatio(Math.min(devicePixelRatio,1.8));rnd.setSize(innerWidth,innerHeight);layoutGlobe();});
+  function clearDestination(){clear(landmarkG);clear(pinG);clear(arcG);targetZoom=innerWidth<700?4.9:4.3;targetRot=null;}
+  return{addPins,mountLandmark,clearDestination};
+})();
+
+/* ---------- local destination scene library ---------- */
+const SCENES=window.ATLAS_DESTINATIONS;
+const SCENE_BY_ALIAS=new Map(SCENES.flatMap(s=>s.aliases.map(a=>[a,s])));
+function findScene(query){const q=String(query||'').toLowerCase().trim();if(!q)return SCENES[0];return SCENE_BY_ALIAS.get(q)||SCENES.find(s=>s.aliases.some(a=>q.includes(a)||a.includes(q)))||null;}
+function activateScene(scene,{focus=true}={}){if(!scene){document.getElementById('scene-status').textContent='WIDE EARTH VIEW · NO LOCAL SCENE';return;}document.getElementById('scene-status').textContent=scene.name.toUpperCase();GL.mountLandmark(scene.lat,scene.lon,scene.kind);if(focus)GL.addPins([{lat:scene.lat,lon:scene.lon}]);}
+const sceneChips=document.getElementById('scene-chips');
+SCENES.forEach((s,i)=>{const b=document.createElement('button');b.type='button';b.className='scene-chip'+(i===0?' selected':'');b.textContent=s.name.split(',')[0];b.onclick=()=>{document.getElementById('dest').value=s.name;document.querySelectorAll('.scene-chip').forEach(x=>x.classList.remove('selected'));b.classList.add('selected');activateScene(s);if(window.atlasLoadPlaceImage)window.atlasLoadPlaceImage(s.name);};sceneChips.appendChild(b);});
+let sceneDebounce;document.getElementById('dest').addEventListener('input',e=>{if(window.atlasPreviewPlace)window.atlasPreviewPlace(e.target.value);clearTimeout(sceneDebounce);sceneDebounce=setTimeout(()=>{const scene=findScene(e.target.value);if(scene){document.querySelectorAll('.scene-chip').forEach(b=>b.classList.toggle('selected',b.textContent===scene.name.split(',')[0]));activateScene(scene);}else{document.getElementById('scene-status').textContent='WIDE EARTH VIEW · NO LOCAL SCENE';GL.clearDestination();}if(window.atlasLoadPlaceImage)window.atlasLoadPlaceImage(e.target.value);},700);});
+
+/* ---------- vibes ---------- */
+const VIBES=['Culture & history','Food & markets','Nature & views','Nightlife','Slow & relaxed','Adventure','Art & design','Hidden gems'];
+let vibe='Culture & history';window.atlasVibe=vibe;
+const vc=document.getElementById('vibes');
+VIBES.forEach((x,i)=>{const b=document.createElement('div');b.className='chip'+(i==0?' on':'');b.textContent=x;b.onclick=()=>{document.querySelectorAll('#vibes .chip').forEach(c=>c.classList.remove('on'));b.classList.add('on');vibe=x;window.atlasVibe=x;};vc.appendChild(b);});
+
+/* ---------- key ---------- */
+/* ---------- plan ---------- */
+async function gemini(prompt){
+  const r=await fetch('/api/plan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt})});
+  const data=await r.json().catch(()=>({}));
+  if(!r.ok)throw new Error(data.error||'AI planning is not configured yet. Use the interactive demo while setting up the Vercel environment key.');
+  return data.text;
+}
+function esc(s){return(s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+
+async function plan(){
+  const dest=document.getElementById('dest').value.trim();if(!dest)return;
+  const days=Math.max(1,Math.min(10,+document.getElementById('days').value||3));
+  const notes=document.getElementById('notes').value.trim();
+  const go=document.getElementById('go');go.disabled=true;go.textContent='Weaving…';
+  const out=document.getElementById('out');out.innerHTML='<div class="wrap"><div class="loading"><div class="spin"></div>Charting '+esc(dest)+' — '+days+' days, '+esc(vibe.toLowerCase())+'…</div></div>';
+  const prompt=`You are an expert local travel planner. Build a realistic ${days}-day itinerary for ${dest}. Vibe: ${vibe}. ${notes?'Weave in: '+notes+'. ':''}Use REAL, specific, currently-existing places with correct coordinates. Return ONLY JSON of this exact shape:
+{"city":"${dest}","summary":"one vivid sentence","days":[{"n":1,"title":"short day theme","lat":<center lat>,"lon":<center lon>,"stops":[{"time":"9:00 AM","name":"real place","desc":"one honest sentence on what to do / why"}]}]}
+3-4 stops per day. Coordinates must be accurate decimals. No markdown, JSON only.`;
+  try{
+    const txt=await gemini(prompt);
+    render(JSON.parse(txt));
+  }catch(e){
+    out.innerHTML='<div class="wrap"><div class="err">'+esc(e.message)+'</div></div>';
+  }finally{go.disabled=false;go.textContent='Weave my itinerary →';}
+}
+
+function render(t){
+  window.atlasCurrentTrip=t;
+  GL.addPins(t.days.map(d=>({lat:d.lat,lon:d.lon})));const matchedScene=findScene(t.city);if(matchedScene)activateScene(matchedScene,{focus:false});else document.getElementById('scene-status').textContent='ROUTE PINNED · NO LOCAL LANDMARK MODEL';
+  let h='<div class="wrap"><div class="trip-head"><div><div class="kick" style="margin-bottom:8px">your itinerary</div><h2>'+esc(t.city)+'</h2><div class="meta">'+esc(t.summary||'')+'</div></div><button class="go" style="width:auto;padding:12px 20px" onclick="window.scrollTo({top:0,behavior:\'smooth\'})">↑ New trip</button></div><div class="days">';
+  t.days.forEach((d,i)=>{
+    h+='<div class="day" data-day-index="'+i+'" style="animation-delay:'+(i*.08)+'s"><h3><span class="dnum">DAY '+d.n+'</span>'+esc(d.title)+'</h3>';
+    (d.stops||[]).forEach((s,j)=>{const q=encodeURIComponent((s.name||'')+' '+(t.city||''));h+='<div class="stop" data-stop-index="'+j+'"><div class="t">'+esc(s.time||'')+'</div><div class="n">'+esc(s.name)+'</div><div class="d">'+esc(s.desc||'')+'</div><div class="stop-actions"><label class="stop-done"><input type="checkbox"> Done</label><a href="https://www.google.com/maps/search/?api=1&query='+q+'" target="_blank" rel="noreferrer">Open directions ↗</a><button type="button" onclick="this.closest(\'.stop\').querySelector(\'.d\').contentEditable=this.closest(\'.stop\').querySelector(\'.d\').contentEditable!==\'true\';this.textContent=this.textContent===\'Edit note\'?\'Done editing\':\'Edit note\'">Edit note</button><button type="button" onclick="removeStop('+i+','+j+')">Remove</button></div></div>';});
+    h+='<button class="add-stop" type="button" onclick="addStop('+i+')">+ Add a stop</button>';
+    h+='</div>';
+  });
+  h+='</div></div>';
+  document.getElementById('out').innerHTML=h;
+  if(window.AtlasTools)window.AtlasTools.onTrip(t);
+  document.getElementById('out').scrollIntoView({behavior:'smooth'});
+}
+function addStop(dayIndex){const name=prompt('Name of the place to add');if(!name?.trim())return;const time=prompt('Suggested time (optional)','2:00 PM')||'';const desc=prompt('What do you want to do there?','Add your own trip note.')||'';window.atlasCurrentTrip.days[dayIndex].stops.push({time,name:name.trim(),desc});render(window.atlasCurrentTrip);}
+function removeStop(dayIndex,stopIndex){if(!confirm('Remove this stop from the day?'))return;window.atlasCurrentTrip.days[dayIndex].stops.splice(stopIndex,1);render(window.atlasCurrentTrip);}
+
+/* ---------- demo ---------- */
+function demo(){
+  render({city:"Kyoto, Japan",summary:"Four days of temples at first light, backstreet coffee, and the slow green of the eastern hills.",days:[
+   {n:1,title:"Eastern temples & Gion",lat:35.0037,lon:135.7788,stops:[
+     {time:"7:00 AM",name:"Kiyomizu-dera",desc:"Arrive before the gates fill — the wooden stage over the valley is pure quiet at dawn."},
+     {time:"10:00 AM",name:"Sannenzaka & Ninenzaka",desc:"Slope lanes of old machiya; duck into a matcha stand before the crowds."},
+     {time:"1:00 PM",name:"Nishiki-adjacent lunch",desc:"Obanzai set — seasonal Kyoto home cooking, cheap and honest."},
+     {time:"5:30 PM",name:"Gion at dusk",desc:"Walk Hanamikoji as lanterns light; you may glimpse a geiko heading to work."}]},
+   {n:2,title:"Arashiyama & bamboo",lat:35.0094,lon:135.6737,stops:[
+     {time:"8:00 AM",name:"Bamboo Grove",desc:"Empty and luminous early; the light down the stalks is the whole point."},
+     {time:"10:00 AM",name:"Tenryu-ji garden",desc:"A 14th-century pond garden framed by the hills — sit, don't rush."},
+     {time:"12:30 PM",name:"Riverside soba",desc:"Cold soba by the Katsura; watch the boats drift under Togetsukyo."},
+     {time:"3:00 PM",name:"Iwatayama monkeys",desc:"A short climb for a wide view over the whole basin, macaques included."}]},
+   {n:3,title:"Fushimi & a thousand gates",lat:34.9671,lon:135.7727,stops:[
+     {time:"7:30 AM",name:"Fushimi Inari",desc:"Start the vermilion tunnels early; most people turn back at the first lookout — keep going."},
+     {time:"11:00 AM",name:"Sake district tasting",desc:"Fushimi's water made it Japan's sake heart; a small brewery flight is a few hundred yen."},
+     {time:"2:00 PM",name:"Tofuku-ji",desc:"Zen halls and a maple valley bridge — serene even in peak season."}]},
+   {n:4,title:"North hills & farewell",lat:35.0394,lon:135.7292,stops:[
+     {time:"9:00 AM",name:"Kinkaku-ji",desc:"The golden pavilion mirrored in its pond — go at opening for the cleanest reflection."},
+     {time:"11:30 AM",name:"Ryoan-ji rock garden",desc:"Fifteen stones you can never see all at once; sit on the veranda and let it work."},
+     {time:"2:00 PM",name:"Philosopher's Path",desc:"A canal-side walk under the trees, ending in a last cup of Kyoto coffee."}]}
+  ]});
+}
+activateScene(SCENES[0]);
+</script>
+<script src="assets/app.js"></script>
+</body></html>
